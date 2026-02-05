@@ -1,0 +1,738 @@
+{% extends "base.html" %}
+
+{% block title %}Explore - Taylor Swift Streams{% endblock %}
+
+{% block extra_css %}
+<style>
+    .explore-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        min-height: 90vh;
+    }
+
+    .tables-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .detail-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        overflow-y: auto;
+        max-height: 90vh;
+    }
+
+    .detail-panel.empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+        text-align: center;
+    }
+
+    .detail-content {
+        display: none;
+    }
+
+    .detail-content.active {
+        display: block;
+    }
+
+    .table-section {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .table-header {
+        padding: 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .table-header h3 {
+        margin: 0 0 1rem 0;
+        font-size: 1.1rem;
+    }
+
+    .table-controls {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .table-controls input,
+    .table-controls select {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid rgba(255,255,255,0.3);
+        border-radius: 4px;
+        background: rgba(255,255,255,0.1);
+        color: white;
+        font-size: 0.85rem;
+    }
+
+    .table-controls input::placeholder {
+        color: rgba(255,255,255,0.7);
+    }
+
+    .table-controls input:focus,
+    .table-controls select:focus {
+        outline: none;
+        background: rgba(255,255,255,0.2);
+        border-color: rgba(255,255,255,0.6);
+    }
+
+    .table-controls button {
+        padding: 0.5rem 1rem;
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .table-controls button:hover {
+        background: rgba(255,255,255,0.3);
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 38vh;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: #f5f5f5;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    thead th {
+        padding: 0.6rem 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        color: #333;
+        border-bottom: 2px solid #ddd;
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+        font-size: 0.8rem;
+    }
+
+    thead th:hover {
+        background: #eee;
+    }
+
+    thead th.sortable::after {
+        content: ' ⇅';
+        opacity: 0.5;
+        font-size: 0.8rem;
+    }
+
+    thead th.active {
+        color: #667eea;
+        background: #f0f0ff;
+    }
+
+    thead th.active.asc::after {
+        content: ' ↑';
+        opacity: 1;
+        color: #667eea;
+    }
+
+    thead th.active.desc::after {
+        content: ' ↓';
+        opacity: 1;
+        color: #667eea;
+    }
+
+    tbody tr {
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    tbody tr:hover {
+        background: rgba(102, 126, 234, 0.05);
+        box-shadow: inset 4px 0 0 #667eea;
+    }
+
+    tbody tr.selected {
+        background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, transparent 100%);
+        box-shadow: inset 4px 0 0 #667eea;
+    }
+
+    tbody td {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .cell-date {
+        font-weight: 500;
+        color: #667eea;
+    }
+
+    .cell-number {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: #333;
+    }
+
+    .cell-title {
+        font-weight: 500;
+        color: #333;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #eee;
+    }
+
+    .detail-title {
+        flex: 1;
+    }
+
+    .detail-title h2 {
+        color: #667eea;
+        margin: 0;
+    }
+
+    .detail-title p {
+        color: #666;
+        margin: 0.5rem 0 0 0;
+    }
+
+    .detail-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .detail-stat {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .detail-stat-label {
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+
+    .detail-stat-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-top: 0.5rem;
+    }
+
+    .video-embed {
+        margin-bottom: 2rem;
+        position: relative;
+        padding-bottom: 56.25%;
+        height: 0;
+        overflow: hidden;
+        border-radius: 8px;
+    }
+
+    .video-embed iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #999;
+    }
+
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    @media (max-width: 1200px) {
+        .explore-container {
+            grid-template-columns: 1fr;
+        }
+
+        .detail-panel {
+            max-height: none;
+        }
+
+        .table-section {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+    <h1 style="color: white; margin-bottom: 0.5rem;">🎵 Explore & Compare</h1>
+    <p style="color: rgba(255,255,255,0.9);">Browse Spotify tracks and YouTube videos with integrated detail view</p>
+</div>
+
+<div class="explore-container">
+    <!-- Left Panel: Tables -->
+    <div class="tables-panel">
+        <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
+            <form id="searchForm" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <input type="text" name="search" placeholder="🔍 Search anything..." value="{{ current_search }}" style="flex: 1; min-width: 200px; padding: 0.75rem 1rem; border: 2px solid #ddd; border-radius: 6px; font-size: 0.95rem;">
+                
+                <select name="date" style="padding: 0.75rem 1rem; border: 2px solid #ddd; border-radius: 6px;">
+                    <option value="">All Dates</option>
+                    {% for date_row in dates %}
+                        <option value="{{ date_row['date'] }}" {% if date_row['date'] == current_date %}selected{% endif %}>{{ date_row['date'] }}</option>
+                    {% endfor %}
+                </select>
+                
+                <button type="submit" style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Search</button>
+            </form>
+        </div>
+
+        <!-- Spotify Table -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3>🎧 Spotify Tracks</h3>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="date" style="cursor: pointer;">📅 Date</th>
+                            <th class="sortable" data-sort="title" style="cursor: pointer;">🎵 Song</th>
+                            <th class="sortable" data-sort="streams" style="cursor: pointer; text-align: right;">📈 Daily</th>
+                            <th class="sortable" data-sort="total" style="cursor: pointer; text-align: right;">🎯 Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="spotifyTable">
+                        {% for item in spotify_data %}
+                        <tr class="table-row" data-id="{{ item.song_id }}" data-platform="spotify" data-type="song" onclick="selectRow(this)">
+                            <td class="cell-date">{{ item.date }}</td>
+                            <td class="cell-title">{{ item.song_name }}</td>
+                            <td class="cell-number">{{ "{:,}".format(item.daily_streams) }}</td>
+                            <td class="cell-number">{{ "{:,}".format(item.total_streams) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- YouTube Table -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3>📺 YouTube Videos</h3>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="date" style="cursor: pointer;">📅 Date</th>
+                            <th class="sortable" data-sort="title" style="cursor: pointer;">🎬 Video</th>
+                            <th class="sortable" data-sort="views" style="cursor: pointer; text-align: right;">📈 Daily</th>
+                            <th class="sortable" data-sort="total" style="cursor: pointer; text-align: right;">🎯 Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="youtubeTable">
+                        {% for item in youtube_data %}
+                        <tr class="table-row" data-id="{{ item.video_id }}" data-platform="youtube" data-type="video" onclick="selectRow(this)">
+                            <td class="cell-date">{{ item.date }}</td>
+                            <td class="cell-title">{{ item.video_name }}</td>
+                            <td class="cell-number">{{ "{:,}".format(item.daily_views) }}</td>
+                            <td class="cell-number">{{ "{:,}".format(item.total_views) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Detail View -->
+    <div class="detail-panel empty" id="detailPanel">
+        <div class="empty-state">
+            <div class="empty-state-icon">👈</div>
+            <p>Select a song or video to view details</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const spotifyData = {{ spotify_data|tojson }};
+    const youtubeData = {{ youtube_data|tojson }};
+    let selectedRow = null;
+    let currentSort = '{{ current_sort }}';
+    let currentOrder = '{{ current_order }}';
+    
+    // Debug: log the data to verify it's loaded correctly
+    console.log('Spotify data loaded:', spotifyData.length, 'items');
+    console.log('YouTube data loaded:', youtubeData.length, 'items');
+    if (spotifyData.length > 0) console.log('First Spotify item:', spotifyData[0]);
+
+    function selectRow(row) {
+        // Remove previous selection
+        if (selectedRow) {
+            selectedRow.classList.remove('selected');
+        }
+        
+        // Mark as selected
+        row.classList.add('selected');
+        selectedRow = row;
+        
+        // Get item info
+        const id = parseInt(row.dataset.id);
+        const platform = row.dataset.platform;
+        
+        console.log('Selected:', platform, 'id:', id);
+        
+        let item, detail;
+        
+        if (platform === 'spotify') {
+            item = spotifyData.find(x => x.song_id === id);
+            console.log('Found Spotify item:', item);
+            if (item) {
+                detail = renderSpotifyDetail(item);
+            } else {
+                detail = '<p style="color: red;">Error: Song data not found</p>';
+            }
+        } else {
+            item = youtubeData.find(x => x.video_id === id);
+            console.log('Found YouTube item:', item);
+            if (item) {
+                detail = renderYoutubeDetail(item);
+            } else {
+                detail = '<p style="color: red;">Error: Video data not found</p>';
+            }
+        }
+        
+        // Update detail panel
+        const panel = document.getElementById('detailPanel');
+        panel.classList.remove('empty');
+        panel.innerHTML = detail;
+        
+        // Fetch and render historical data
+        if (platform === 'spotify') {
+            fetch(`/api/spotify/${id}/history`)
+                .then(r => r.json())
+                .then(history => {
+                    renderSpotifyChart(history);
+                    renderSpotifyHistoryTable(history);
+                })
+                .catch(e => console.error('Error fetching Spotify history:', e));
+        } else {
+            fetch(`/api/youtube/${id}/history`)
+                .then(r => r.json())
+                .then(history => {
+                    renderYoutubeChart(history);
+                    renderYoutubeHistoryTable(history);
+                })
+                .catch(e => console.error('Error fetching YouTube history:', e));
+        }
+    }
+    
+    function renderSpotifyChart(history) {
+        setTimeout(() => {
+            const ctx = document.getElementById('spotifyChart');
+            if (!ctx) return;
+            
+            const dates = history.map(h => h.date);
+            const dailyStreams = history.map(h => h.daily_streams);
+            const totalStreams = history.map(h => h.total_streams);
+            
+            if (window.spotifyChartInstance) window.spotifyChartInstance.destroy();
+            
+            window.spotifyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Daily Streams',
+                            data: dailyStreams,
+                            borderColor: '#1DB954',
+                            backgroundColor: 'rgba(29, 185, 84, 0.1)',
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Total Streams',
+                            data: totalStreams,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Daily Streams' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Total Streams' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }, 0);
+    }
+    
+    function renderYoutubeChart(history) {
+        setTimeout(() => {
+            const ctx = document.getElementById('youtubeChart');
+            if (!ctx) return;
+            
+            const dates = history.map(h => h.date);
+            const dailyViews = history.map(h => h.daily_views);
+            const totalViews = history.map(h => h.total_views);
+            
+            if (window.youtubeChartInstance) window.youtubeChartInstance.destroy();
+            
+            window.youtubeChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Daily Views',
+                            data: dailyViews,
+                            borderColor: '#FF0000',
+                            backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Total Views',
+                            data: totalViews,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Daily Views' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Total Views' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }, 0);
+    }
+    
+    function renderSpotifyHistoryTable(history) {
+        const tbody = document.getElementById('spotifyHistoryTable');
+        if (!tbody) return;
+        
+        tbody.innerHTML = history.map(h => `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 0.75rem; color: #667eea; font-weight: 500;">${h.date}</td>
+                <td style="padding: 0.75rem; text-align: right; color: #333;">${h.daily_streams.toLocaleString()}</td>
+                <td style="padding: 0.75rem; text-align: right; color: #333;">${h.total_streams.toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+    
+    function renderYoutubeHistoryTable(history) {
+        const tbody = document.getElementById('youtubeHistoryTable');
+        if (!tbody) return;
+        
+        tbody.innerHTML = history.map(h => `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 0.75rem; color: #667eea; font-weight: 500;">${h.date}</td>
+                <td style="padding: 0.75rem; text-align: right; color: #333;">${h.daily_views.toLocaleString()}</td>
+                <td style="padding: 0.75rem; text-align: right; color: #333;">${h.total_views.toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderSpotifyDetail(item) {
+        return `
+            <div class="detail-header">
+                <div class="detail-title">
+                    <h2>🎧 ${item.song_name}</h2>
+                    <p>${item.artist_name}</p>
+                    <p style="font-size: 0.85rem; color: #999; margin-top: 0.5rem;">Last updated: ${item.date}</p>
+                </div>
+                <a href="${item.url}" target="_blank" style="padding: 0.75rem 1.5rem; background: #1DB954; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; height: fit-content;">Open Spotify →</a>
+            </div>
+            
+            <div class="detail-stats">
+                <div class="detail-stat">
+                    <div class="detail-stat-label">Latest Daily</div>
+                    <div class="detail-stat-value">${item.daily_streams.toLocaleString()}</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="detail-stat-label">Total Streams</div>
+                    <div class="detail-stat-value">${item.total_streams.toLocaleString()}</div>
+                </div>
+            </div>
+            
+            <div style="margin: 2rem 0;">
+                <h3 style="color: #333; margin-bottom: 1rem; font-size: 1rem;">Stream Trends</h3>
+                <canvas id="spotifyChart" style="max-height: 300px;"></canvas>
+            </div>
+            
+            <div style="margin-top: 2rem;">
+                <h3 style="color: #333; margin-bottom: 1rem; font-size: 1rem;">Historical Data</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                                <th style="padding: 0.75rem; text-align: left; font-weight: 600;">Date</th>
+                                <th style="padding: 0.75rem; text-align: right; font-weight: 600;">Daily Streams</th>
+                                <th style="padding: 0.75rem; text-align: right; font-weight: 600;">Total Streams</th>
+                            </tr>
+                        </thead>
+                        <tbody id="spotifyHistoryTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderYoutubeDetail(item) {
+        return `
+            <div class="detail-header">
+                <div class="detail-title">
+                    <h2>📺 ${item.video_name}</h2>
+                    <p>${item.artist_name}</p>
+                    <p style="font-size: 0.85rem; color: #999; margin-top: 0.5rem;">Last updated: ${item.date}</p>
+                </div>
+                <a href="${item.url}" target="_blank" style="padding: 0.75rem 1.5rem; background: #FF0000; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; height: fit-content;">Open YouTube →</a>
+            </div>
+            
+            <div class="video-embed">
+                <iframe src="https://www.youtube.com/embed/${item.watch_id}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+            
+            <div class="detail-stats">
+                <div class="detail-stat">
+                    <div class="detail-stat-label">Latest Daily</div>
+                    <div class="detail-stat-value">${item.daily_views.toLocaleString()}</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="detail-stat-label">Total Views</div>
+                    <div class="detail-stat-value">${item.total_views.toLocaleString()}</div>
+                </div>
+            </div>
+            
+            <div style="margin: 2rem 0;">
+                <h3 style="color: #333; margin-bottom: 1rem; font-size: 1rem;">View Trends</h3>
+                <canvas id="youtubeChart" style="max-height: 300px;"></canvas>
+            </div>
+            
+            <div style="margin-top: 2rem;">
+                <h3 style="color: #333; margin-bottom: 1rem; font-size: 1rem;">Historical Data</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                                <th style="padding: 0.75rem; text-align: left; font-weight: 600;">Date</th>
+                                <th style="padding: 0.75rem; text-align: right; font-weight: 600;">Daily Views</th>
+                                <th style="padding: 0.75rem; text-align: right; font-weight: 600;">Total Views</th>
+                            </tr>
+                        </thead>
+                        <tbody id="youtubeHistoryTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    function formatNumber(num) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Handle sort column clicks
+    document.querySelectorAll('thead th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortField = th.dataset.sort;
+            const table = th.closest('table');
+            const isSpotify = table.id === 'spotifyTable';
+            
+            // Determine sort parameter based on field and platform
+            let sortParam = 'date';
+            if (sortField === 'title') sortParam = 'title';
+            else if (sortField === 'streams' && isSpotify) sortParam = 'streams';
+            else if (sortField === 'views' && !isSpotify) sortParam = 'views';
+            else if (sortField === 'total') sortParam = 'total';
+            
+            // Update sort parameters
+            const newOrder = currentSort === sortParam && currentOrder === 'desc' ? 'asc' : 'desc';
+            const params = new URLSearchParams(window.location.search);
+            params.set('sort', sortParam);
+            params.set('order', newOrder);
+            window.location.href = '?' + params.toString();
+        });
+    });
+
+    // Handle search form
+    document.getElementById('searchForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const search = document.querySelector('input[name="search"]').value;
+        const date = document.querySelector('select[name="date"]').value;
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (date) params.set('date', date);
+        window.location.href = '?' + params.toString();
+    });
+</script>
+{% endblock %}
